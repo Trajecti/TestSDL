@@ -1,8 +1,9 @@
 #include "stdafx.h"
 #include <SDL.h>
+#include <SDL_image.h>
 #undef main
 #include <iostream>
-#include <string>>
+#include <string>
 
 //screen dimension constants
 const int SCREEN_WIDTH = 640;
@@ -35,7 +36,7 @@ SDL_Window* gWindow = NULL;
 SDL_Surface* loadSurface(std::string path);
 
 //Surface contained by the window
-SDL_Surface* gscreenSurface = NULL;
+SDL_Surface* gScreenSurface = NULL;
 
 //Images associated to a keypress
 SDL_Surface* gKeyPressSurfaces[KEY_PRESS_SURFACE_TOTAL];
@@ -45,14 +46,26 @@ SDL_Surface* gCurrentSurface = NULL;
 
 SDL_Surface* loadSurface(std::string path) {
 
-	//load image at specified path
-	SDL_Surface* loadedSurface = SDL_LoadBMP(path.c_str());
+	//The final optimized image
+	SDL_Surface* optimizedSurface = NULL;
+
+	//Load image at specified path
+	SDL_Surface* loadedSurface = IMG_Load(path.c_str());
 
 	if (loadedSurface == NULL) {
-		std::cout << "Unable to load image "<< path << " ! SDL_Error: " << SDL_GetError() << '\n';
+		std::cout << "Unable to load image "<< path << " ! SDL_Error: " << IMG_GetError() << '\n';
 	}
+	else {
+		//Convert surface to screen format
+		optimizedSurface = SDL_ConvertSurface(loadedSurface, gScreenSurface->format, NULL);
+		if (optimizedSurface == NULL) {
+			std::cout << "Unable to optimize image " << path << " ! SDL_Error: " << SDL_GetError() << '\n';
+		}
 
-	return loadedSurface;
+		//get rid of old surface
+		SDL_FreeSurface(loadedSurface);
+	}
+	return optimizedSurface;
 }
 
 bool init() {
@@ -73,8 +86,18 @@ bool init() {
 			success = false;
 		}
 		else {
-			//Get Window surface
-			gscreenSurface = SDL_GetWindowSurface(gWindow);
+			//Initialize PNG loading
+			int imgFlags = IMG_INIT_PNG;
+			if (!(IMG_Init(imgFlags) & imgFlags))
+			{
+				printf("SDL_image could not initialize! SDL_image Error: %s\n", IMG_GetError());
+				success = false;
+			}
+			else
+			{
+				//Get window surface
+				gScreenSurface = SDL_GetWindowSurface(gWindow);
+			}
 		}
 	}
 
@@ -203,8 +226,13 @@ int main()
 			}
 		}
 
-		//Apply the image
-		SDL_BlitSurface(gCurrentSurface, NULL, gscreenSurface, NULL);
+		//Apply the image streteched
+		SDL_Rect strechRect;
+		strechRect.x = 0;
+		strechRect.y = 0;
+		strechRect.w = SCREEN_WIDTH;
+		strechRect.h = SCREEN_HEIGHT;
+		SDL_BlitSurface(gCurrentSurface, NULL, gScreenSurface, &strechRect);
 
 		//Update surface
 		SDL_UpdateWindowSurface(gWindow);
